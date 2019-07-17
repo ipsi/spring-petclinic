@@ -1,0 +1,43 @@
+---
+resources:
+- name: ipsi-spring-petclinic
+  type: git
+  source:
+    uri: "git@github.com:ipsi/spring-petclinic.git"
+    private_key: ((private-key))
+- name: ispc-gcr
+  type: docker-image
+  source:
+    repository: eu.gcr.io/labs-athorburn/ipsi-spring-petclinic
+    username: "_json_key"
+    password: ((gcr-password))
+
+
+jobs:
+- name: build-petclinic
+  plan:
+  - get: ipsi-spring-petclinic
+    trigger: true
+  - task: test
+    config:
+      platform: linux
+      image_resource:
+        type: docker-image
+        source:
+          repository: openjdk
+          tag: '8'
+      inputs:
+      - name: ipsi-spring-petclinic
+      outputs:
+      - name: ipsi-spring-petclinic
+      caches:
+      - path: m2repo/
+      run:
+        path: bash
+        args:
+        - "-c"
+        - "export MAVEN_OPTS=\"-Dmaven.repo.local=$PWD/m2repo\"; cd ipsi-spring-petclinic; ./mvnw package; echo \"git$(git rev-parse --short HEAD)\" > tag-file"
+  - put: ispc-gcr
+    params:
+      build: ipsi-spring-petclinic
+      tag-file: ipsi-spring-petclinic/tag-file
